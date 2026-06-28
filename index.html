@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Scrapbook - Geser Halaman</title>
+    
+    <style>
+        @import url('https://googleapis.com');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none; /* Mencegah teks terblok saat digeser */
+        }
+
+        body {
+            background-color: #2b261f;
+            background-image: radial-gradient(#403a30 1px, transparent 1px);
+            background-size: 20px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier Prime', monospace;
+            perspective: 1500px;
+            overflow: hidden;
+        }
+
+        /* Petunjuk di atas buku */
+        .hint-text {
+            position: absolute;
+            top: 40px;
+            color: #d9c3b0;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            opacity: 0.7;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 0.9; }
+            100% { opacity: 0.4; }
+        }
+
+        /* Wadah Utama Scrapbook */
+        .scrapbook-wrapper {
+            position: relative;
+            width: 900px;
+            height: 550px;
+            background-color: #4e3629;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.7);
+            transform-style: preserve-3d;
+        }
+
+        /* Kerangka Dasar Halaman */
+        .page {
+            position: absolute;
+            width: 435px;
+            height: 520px;
+            background-color: #f4ebd0;
+            top: 15px;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            padding: 40px;
+        }
+
+        /* Halaman Kiri Permanen */
+        .page-base-left {
+            left: 15px;
+            border-radius: 4px 0 0 4px;
+            border-right: 2px solid rgba(0,0,0,0.15);
+        }
+
+        /* Halaman Kanan Permanen */
+        .page-base-right {
+            right: 15px;
+            border-radius: 0 4px 4px 0;
+            border-left: 2px solid rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        /* HALAMAN TENGAH YANG BISA DIGESER (FLIP PAGE) */
+        .flip-page {
+            position: absolute;
+            width: 435px;
+            height: 520px;
+            top: 15px;
+            right: 15px;
+            transform-origin: left center;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 5;
+            cursor: grab; /* Mengubah kursor menjadi tangan mencengkeram */
+        }
+
+        .flip-page:active {
+            cursor: grabbing;
+        }
+
+        /* Ketika halaman terbuka penuh ke kiri */
+        .flip-page.flipped {
+            transform: rotateY(-180deg);
+            z-index: 10;
+        }
+
+        /* Sisi Depan dan Belakang Kertas */
+        .page-front, .page-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            padding: 40px;
+            background-color: #f4ebd0;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.1);
+        }
+
+        .page-front {
+            border-radius: 0 4px 4px 0;
+        }
+
+        .page-back {
+            transform: rotateY(180deg);
+            border-radius: 4px 0 0 4px;
+            border-right: 2px solid rgba(0,0,0,0.15);
+        }
+
+        /* DEKORASI VINTAGE & SLIDER FOTO */
+        .tape {
+            position: absolute;
+            width: 100px;
+            height: 30px;
+            background-color: rgba(210, 180, 140, 0.4);
+            backdrop-filter: blur(1px);
+            top: 15px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .tape-left { left: -20px; transform: rotate(-30deg); }
+        .tape-right { right: -20px; transform: rotate(35deg); }
+
+        .title {
+            font-family: 'Reenie Beanie', cursive;
+            font-size: 3.5rem;
+            color: #4a3319;
+            margin-bottom: 20px;
+            line-height: 1;
+            pointer-events: none;
+        }
+
+        .journal-text {
+            font-size: 1rem;
+            color: #3d3123;
+            line-height: 1.6;
+            text-align: justify;
+            pointer-events: none;
+        }
+
+        /* Slider Foto di Halaman Belakang */
+        .scrapbook-slider {
+            position: relative;
+            width: 280px;
+            height: 360px;
+            margin: 10px auto 0 auto;
+            overflow: hidden;
+        }
+
+        .scrapbook-slider input[type="radio"] { display: none; }
+
+        .slides-container {
+            display: flex;
+            width: 300%;
+            height: 320px;
+            transition: transform 0.5s ease-in-out;
+        }
+
+        .photo-frame {
+            width: 260px;
+            height: 300px;
+            background-color: #ffffff;
+            padding: 12px 12px 20px 12px;
+            margin: 10px;
+            box-shadow: 5px 10px 20px rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+
+        .slide-1 { transform: rotate(3deg); }
+        .slide-2 { transform: rotate(-2deg); }
+        .slide-3 { transform: rotate(4deg); }
+
+        .photo-frame img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            filter: sepia(0.3) contrast(0.9);
+        }
+
+        .photo-caption {
+            font-family: 'Reenie Beanie', cursive;
+            font-size: 1.5rem;
+            text-align: center;
+            margin-top: 5px;
+            color: #222;
+        }
+
+        #img-1:checked ~ .slides-container { transform: translateX(0); }
+        #img-2:checked ~ .slides-container { transform: translateX(-280px); }
+        #img-3:checked ~ .slides-container { transform: translateX(-560px); }
+
+        .slider-navigation {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #d9c3b0;
+            border: 1px solid #4a3319;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        #img-1:checked ~ .slider-navigation .nav-dot:nth-child(1),
+        #img-2:checked ~ .slider-navigation .nav-dot:nth-child(2),
+        #img-3:checked ~ .slider-navigation .nav-dot:nth-child(3) {
+            background-color: #4a3319;
+        }
+
+        .ticket-dekor {
+            background-color: #c46851;
+            color: #f4ebd0;
+            padding: 8px 15px;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            transform: rotate(-5deg);
+            border: 1px dashed #f4ebd0;
+            box-shadow: 3px 3px 8px rgba(0,0,0,0.2);
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="hint-text">Tarik / Geser halaman untuk membuka buku</div>
+
+    <div class="scrapbook-wrapper">
+
+        <!-- KIRI PERMANEN -->
+        <div class="page page-base-left">
+            <div class="tape tape-left"></div>
+            <h1 class="title">Daftar Cerita</h1>
+            <p class="journal-text">
+                Selamat datang di jurnal kenangan digital ini. Buku ini menyimpan lembar demi lembar kisah perjalanan, tawa, dan tempat-tempat indah yang pernah disinggahi.<br><br>
+                Geser kembali halaman ke arah kanan jika Anda ingin menutup lembaran album ini.
+            </p>
+        </div>
+
+        <!-- TENGAH: HALAMAN INTERAKTIF (BISA DIGESER MOUSE / SWIPE) -->
+        <div class="flip-page" id="movable-page">
+            
+            <!-- SISI DEPAN (Halaman 2) -->
+            <div class="page-front">
+                <div class="tape tape-right"></div>
+                <h1 class="title">Musim Panas 2026</h1>
+                <p class="journal-text">
+                    Hari itu matahari bersinar sangat cerah. Kami berjalan menyusuri kota tua, menemukan kedai kopi tersembunyi, dan menghabiskan waktu hingga senja tiba. Momen sederhana yang diabadikan lewat lensa kamera.
+                </p>
+                <p style="margin-top: 40px; font-size: 0.8rem; color: #888; text-align: center;">&larr; Seret kertas ke kiri untuk membalik &larr;</p>
+            </div>
+
+            <!-- SISI BELAKANG (Halaman 3) -->
+            <div class="page-back">
+                <div class="tape tape-left"></div>
+                
+                <div class="scrapbook-slider">
+                    <input type="radio" name="slide" id="img-1" checked>
+                    <input type="radio" name="slide" id="img-2">
+                    <input type="radio" name="slide" id="img-3">
+
+                    <div class="slides-container">
+                        <div class="photo-frame slide-1">
+                            <img src="https://unsplash.com" alt="Pantai">
+                            <p class="photo-caption">Pantai Sanur</p>
+                        </div>
+                        <div class="photo-frame slide-2">
+                            <img src="https://unsplash.com" alt="Gunung">
+                            <p class="photo-caption">Puncak Gunung</p>
+                        </div>
+                        <div class="photo-frame slide-3">
+                            <img src="https://unsplash.com" alt="Hutan">
